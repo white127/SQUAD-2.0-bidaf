@@ -1,0 +1,484 @@
+diff basic/cli.py ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/cli.py
+32,34d31
+< flags.DEFINE_bool("wy", False, "Use wy for loss / eval? [False]")
+< flags.DEFINE_bool("na", False, "Enable no answer strategy and learn bias? [False]")
+< flags.DEFINE_float("th", 0.5, "Threshold [0.5]")
+37c34
+< flags.DEFINE_integer("batch_size", 30, "Batch size [60]")
+---
+> flags.DEFINE_integer("batch_size", 60, "Batch size [60]")
+41c38
+< flags.DEFINE_integer("num_steps", 10000, "Number of steps [20000]")
+---
+> flags.DEFINE_integer("num_steps", 20000, "Number of steps [20000]")
+43c40
+< flags.DEFINE_float("init_lr", 0.001, "Initial learning rate [0.001]")
+---
+> flags.DEFINE_float("init_lr", 0.5, "Initial learning rate [0.5]")
+57a55
+> flags.DEFINE_float("word_keep_prob", 1.0, "Keep prob for the dropout of words [1.0]")
+diff basic/ensemble.py ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/ensemble.py
+10c10
+< from squad.utils import get_phrase, get_best_span, get_span_score_pairs
+---
+> from squad.utils import get_phrase, get_best_span
+45c45
+<         answer = ensemble4(context, wordss, yp_list, yp2_list)
+---
+>         answer = ensemble3(context, wordss, yp_list, yp2_list)
+87,96d86
+< 
+< 
+< def ensemble4(context, wordss, y1_list, y2_list):
+<     d = defaultdict(lambda: 0.0)
+<     for y1, y2 in zip(y1_list, y2_list):
+<         for span, score in get_span_score_pairs(y1, y2):
+<             d[span] += score
+<     span = max(d.items(), key=lambda pair: pair[1])[0]
+<     phrase = get_phrase(context, wordss, span)
+<     return phrase
+diff basic/evaluator.py ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/evaluator.py
+8c8
+< from squad.utils import get_phrase, get_best_span, get_best_span_wy
+---
+> from squad.utils import get_phrase, get_best_span
+228a229
+>         new_id2na_dict = dict(list(self.id2answer_dict['na'].items()) + list(other.id2answer_dict['na'].items()))
+230,237c231,232
+<         if 'na' in self.id2answer_dict:
+<             new_id2na_dict = dict(list(self.id2answer_dict['na'].items()) + list(other.id2answer_dict['na'].items()))
+<             new_id2answer_dict['na'] = new_id2na_dict
+<         e = F1Evaluation(self.data_type, self.global_step, new_idxs, new_yp, new_yp2, new_y, new_correct, new_loss, new_f1s, new_id2answer_dict)
+<         if 'wyp' in self.dict:
+<             new_wyp = self.dict['wyp'] + other.dict['wyp']
+<             e.dict['wyp'] = new_wyp
+<         return e
+---
+>         new_id2answer_dict['na'] = new_id2na_dict
+>         return F1Evaluation(self.data_type, self.global_step, new_idxs, new_yp, new_yp2, new_y, new_correct, new_loss, new_f1s, new_id2answer_dict)
+247d241
+<         self.wyp = model.wyp
+249,250c243
+<         if config.na:
+<             self.na = model.na_prob
+---
+>         self.na = model.na_prob
+256,259c249
+<         if self.config.na:
+<             global_step, yp, yp2, wyp, loss, na, vals = sess.run([self.global_step, self.yp, self.yp2, self.wyp, self.loss, self.na, list(self.tensor_dict.values())], feed_dict=feed_dict)
+<         else:
+<             global_step, yp, yp2, wyp, loss, vals = sess.run([self.global_step, self.yp, self.yp2, self.wyp, self.loss, list(self.tensor_dict.values())], feed_dict=feed_dict)
+---
+>         global_step, yp, yp2, loss, vals, na = sess.run([self.global_step, self.yp, self.yp2, self.loss, list(self.tensor_dict.values()), self.na], feed_dict=feed_dict)
+284,288c274,275
+<         yp, yp2, wyp = yp[:data_set.num_examples], yp2[:data_set.num_examples], wyp[:data_set.num_examples]
+<         if self.config.wy:
+<             spans, scores = zip(*[get_best_span_wy(wypi, self.config.th) for wypi in wyp])
+<         else:
+<             spans, scores = zip(*[get_best_span(ypi, yp2i) for ypi, yp2i in zip(yp, yp2)])
+---
+>         yp, yp2 = yp[:data_set.num_examples], yp2[:data_set.num_examples]
+>         spans, scores = zip(*[get_best_span(ypi, yp2i) for ypi, yp2i in zip(yp, yp2)])
+306a294
+>         id2na_dict = {id_: float(each) for id_, each in zip(data_set.data['ids'], na)}
+308,310c296
+<         if self.config.na:
+<             id2na_dict = {id_: float(each) for id_, each in zip(data_set.data['ids'], na)}
+<             id2answer_dict['na'] = id2na_dict
+---
+>         id2answer_dict['na'] = id2na_dict
+316,317d301
+<         if self.config.wy:
+<             e.dict['wyp'] = wyp.tolist()
+361,363c345,346
+<             self.yp = tf.concat(axis=0, values=[padded_reshape(model.yp, [N, M, JX]) for model in models])
+<             self.yp2 = tf.concat(axis=0, values=[padded_reshape(model.yp2, [N, M, JX]) for model in models])
+<             self.wy = tf.concat(axis=0, values=[padded_reshape(model.wy, [N, M, JX]) for model in models])
+---
+>             self.yp = tf.concat(0, [padded_reshape(model.yp, [N, M, JX]) for model in models])
+>             self.yp2 = tf.concat(0, [padded_reshape(model.yp2, [N, M, JX]) for model in models])
+384,385c367
+<         if config.na:
+<             self.na = model.na_prob
+---
+>         self.na = model.na_prob
+391,394c373
+<         if self.config.na:
+<             global_step, yp, yp2, loss, na, vals = sess.run([self.global_step, self.yp, self.yp2, self.loss, self.na, list(self.tensor_dict.values())], feed_dict=feed_dict)
+<         else:
+<             global_step, yp, yp2, loss, vals = sess.run([self.global_step, self.yp, self.yp2, self.loss, list(self.tensor_dict.values())], feed_dict=feed_dict)
+---
+>         global_step, yp, yp2, loss, vals, na = sess.run([self.global_step, self.yp, self.yp2, self.loss, list(self.tensor_dict.values()), self.na], feed_dict=feed_dict)
+417,419c396,397
+<         if self.config.na:
+<             id2na_dict = {id_: float(each) for id_, each in zip(data_set.data['ids'], na)}
+<             id2answer_dict['na'] = id2na_dict
+---
+>         id2na_dict = {id_: float(each) for id_, each in zip(data_set.data['ids'], na)}
+>         id2answer_dict['na'] = id2na_dict
+422d399
+<         # TODO : wy support
+Only in basic/: evaluator.pyc
+Only in basic/: get_pr.py
+diff basic/graph_handler.py ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/graph_handler.py
+23c23
+<         sess.run(tf.global_variables_initializer())
+---
+>         sess.run(tf.initialize_all_variables())
+28c28
+<             self.writer = tf.summary.FileWriter(self.config.log_dir, graph=tf.get_default_graph())
+---
+>             self.writer = tf.train.SummaryWriter(self.config.log_dir, graph=tf.get_default_graph())
+36c36
+<         vars_ = {var.name.split(":")[0]: var for var in tf.global_variables()}
+---
+>         vars_ = {var.name.split(":")[0]: var for var in tf.all_variables()}
+Only in basic/: __init__.pyc
+diff basic/main.py ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/main.py
+17d16
+< from my.tensorflow import get_num_params
+85d83
+<     print("num params: {}".format(get_num_params()))
+194d191
+<     print("num params: {}".format(get_num_params()))
+Only in basic/: main.pyc
+diff basic/model.py ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/model.py
+6c6
+< from tensorflow.contrib.rnn import BasicLSTMCell
+---
+> from tensorflow.python.ops.rnn_cell import BasicLSTMCell
+19,20d18
+<             if gpu_idx > 0:
+<                 tf.get_variable_scope().reuse_variables()
+21a20
+>             tf.get_variable_scope().reuse_variables()
+45d43
+<         self.wy = tf.placeholder('bool', [N, None, None], name='wy')
+57d54
+<         self.na_prob = None
+70,71c67,68
+<         self.summary = tf.summary.merge_all()
+<         self.summary = tf.summary.merge(tf.get_collection("summaries", scope=self.scope))
+---
+>         self.summary = tf.merge_all_summaries()
+>         self.summary = tf.merge_summary(tf.get_collection("summaries", scope=self.scope))
+115c112
+<                         word_emb_mat = tf.concat(axis=0, values=[word_emb_mat, self.new_emb_mat])
+---
+>                         word_emb_mat = tf.concat(0, [word_emb_mat, self.new_emb_mat])
+123,124c120,121
+<                     xx = tf.concat(axis=3, values=[xx, Ax])  # [N, M, JX, di]
+<                     qq = tf.concat(axis=2, values=[qq, Aq])  # [N, JQ, di]
+---
+>                     xx = tf.concat(3, [xx, Ax])  # [N, M, JX, di]
+>                     qq = tf.concat(2, [qq, Aq])  # [N, JQ, di]
+139,154c136,137
+<         cell_fw = BasicLSTMCell(d, state_is_tuple=True)
+<         cell_bw = BasicLSTMCell(d, state_is_tuple=True)
+<         d_cell_fw = SwitchableDropoutWrapper(cell_fw, self.is_train, input_keep_prob=config.input_keep_prob)
+<         d_cell_bw = SwitchableDropoutWrapper(cell_bw, self.is_train, input_keep_prob=config.input_keep_prob)
+<         cell2_fw = BasicLSTMCell(d, state_is_tuple=True)
+<         cell2_bw = BasicLSTMCell(d, state_is_tuple=True)
+<         d_cell2_fw = SwitchableDropoutWrapper(cell2_fw, self.is_train, input_keep_prob=config.input_keep_prob)
+<         d_cell2_bw = SwitchableDropoutWrapper(cell2_bw, self.is_train, input_keep_prob=config.input_keep_prob)
+<         cell3_fw = BasicLSTMCell(d, state_is_tuple=True)
+<         cell3_bw = BasicLSTMCell(d, state_is_tuple=True)
+<         d_cell3_fw = SwitchableDropoutWrapper(cell3_fw, self.is_train, input_keep_prob=config.input_keep_prob)
+<         d_cell3_bw = SwitchableDropoutWrapper(cell3_bw, self.is_train, input_keep_prob=config.input_keep_prob)
+<         cell4_fw = BasicLSTMCell(d, state_is_tuple=True)
+<         cell4_bw = BasicLSTMCell(d, state_is_tuple=True)
+<         d_cell4_fw = SwitchableDropoutWrapper(cell4_fw, self.is_train, input_keep_prob=config.input_keep_prob)
+<         d_cell4_bw = SwitchableDropoutWrapper(cell4_bw, self.is_train, input_keep_prob=config.input_keep_prob)
+---
+>         cell = BasicLSTMCell(d, state_is_tuple=True)
+>         d_cell = SwitchableDropoutWrapper(cell, self.is_train, input_keep_prob=config.input_keep_prob)
+159,160c142,143
+<             (fw_u, bw_u), ((_, fw_u_f), (_, bw_u_f)) = bidirectional_dynamic_rnn(d_cell_fw, d_cell_bw, qq, q_len, dtype='float', scope='u1')  # [N, J, d], [N, d]
+<             u = tf.concat(axis=2, values=[fw_u, bw_u])
+---
+>             (fw_u, bw_u), ((_, fw_u_f), (_, bw_u_f)) = bidirectional_dynamic_rnn(d_cell, d_cell, qq, q_len, dtype='float', scope='u1')  # [N, J, d], [N, d]
+>             u = tf.concat(2, [fw_u, bw_u])
+163,164c146,147
+<                 (fw_h, bw_h), _ = bidirectional_dynamic_rnn(cell_fw, cell_bw, xx, x_len, dtype='float', scope='u1')  # [N, M, JX, 2d]
+<                 h = tf.concat(axis=3, values=[fw_h, bw_h])  # [N, M, JX, 2d]
+---
+>                 (fw_h, bw_h), _ = bidirectional_dynamic_rnn(cell, cell, xx, x_len, dtype='float', scope='u1')  # [N, M, JX, 2d]
+>                 h = tf.concat(3, [fw_h, bw_h])  # [N, M, JX, 2d]
+166,167c149,150
+<                 (fw_h, bw_h), _ = bidirectional_dynamic_rnn(cell_fw, cell_bw, xx, x_len, dtype='float', scope='h1')  # [N, M, JX, 2d]
+<                 h = tf.concat(axis=3, values=[fw_h, bw_h])  # [N, M, JX, 2d]
+---
+>                 (fw_h, bw_h), _ = bidirectional_dynamic_rnn(cell, cell, xx, x_len, dtype='float', scope='h1')  # [N, M, JX, 2d]
+>                 h = tf.concat(3, [fw_h, bw_h])  # [N, M, JX, 2d]
+176,183c159,160
+<                 first_cell_fw = AttentionCell(cell2_fw, u, mask=q_mask, mapper='sim',
+<                                               input_keep_prob=self.config.input_keep_prob, is_train=self.is_train)
+<                 first_cell_bw = AttentionCell(cell2_bw, u, mask=q_mask, mapper='sim',
+<                                               input_keep_prob=self.config.input_keep_prob, is_train=self.is_train)
+<                 second_cell_fw = AttentionCell(cell3_fw, u, mask=q_mask, mapper='sim',
+<                                             input_keep_prob=self.config.input_keep_prob, is_train=self.is_train)
+<                 second_cell_bw = AttentionCell(cell3_bw, u, mask=q_mask, mapper='sim',
+<                                                input_keep_prob=self.config.input_keep_prob, is_train=self.is_train)
+---
+>                 first_cell = AttentionCell(cell, u, mask=q_mask, mapper='sim',
+>                                            input_keep_prob=self.config.input_keep_prob, is_train=self.is_train)
+186,194c163,168
+<                 first_cell_fw = d_cell2_fw
+<                 second_cell_fw = d_cell3_fw
+<                 first_cell_bw = d_cell2_bw
+<                 second_cell_bw = d_cell3_bw
+< 
+<             (fw_g0, bw_g0), _ = bidirectional_dynamic_rnn(first_cell_fw, first_cell_bw, p0, x_len, dtype='float', scope='g0')  # [N, M, JX, 2d]
+<             g0 = tf.concat(axis=3, values=[fw_g0, bw_g0])
+<             (fw_g1, bw_g1), _ = bidirectional_dynamic_rnn(second_cell_fw, second_cell_bw, g0, x_len, dtype='float', scope='g1')  # [N, M, JX, 2d]
+<             g1 = tf.concat(axis=3, values=[fw_g1, bw_g1])
+---
+>                 first_cell = d_cell
+> 
+>             (fw_g0, bw_g0), _ = bidirectional_dynamic_rnn(first_cell, first_cell, p0, x_len, dtype='float', scope='g0')  # [N, M, JX, 2d]
+>             g0 = tf.concat(3, [fw_g0, bw_g0])
+>             (fw_g1, bw_g1), _ = bidirectional_dynamic_rnn(first_cell, first_cell, g0, x_len, dtype='float', scope='g1')  # [N, M, JX, 2d]
+>             g1 = tf.concat(3, [fw_g1, bw_g1])
+201c175
+<             (fw_g2, bw_g2), _ = bidirectional_dynamic_rnn(d_cell4_fw, d_cell4_bw, tf.concat(axis=3, values=[p0, g1, a1i, g1 * a1i]),
+---
+>             (fw_g2, bw_g2), _ = bidirectional_dynamic_rnn(d_cell, d_cell, tf.concat(3, [p0, g1, a1i, g1 * a1i]),
+203c177
+<             g2 = tf.concat(axis=3, values=[fw_g2, bw_g2])
+---
+>             g2 = tf.concat(3, [fw_g2, bw_g2])
+208,229c182,188
+<             flat_logits = tf.reshape(logits, [-1, M * JX])
+<             flat_yp = tf.nn.softmax(flat_logits)  # [-1, M*JX]
+<             flat_logits2 = tf.reshape(logits2, [-1, M * JX])
+<             flat_yp2 = tf.nn.softmax(flat_logits2)
+< 
+<             if config.na:
+<                 na_bias = tf.get_variable("na_bias", shape=[], dtype='float')
+<                 na_bias_tiled = tf.tile(tf.reshape(na_bias, [1, 1]), [N, 1])  # [N, 1]
+<                 concat_flat_logits = tf.concat(axis=1, values=[na_bias_tiled, flat_logits])
+<                 concat_flat_yp = tf.nn.softmax(concat_flat_logits)
+<                 na_prob = tf.squeeze(tf.slice(concat_flat_yp, [0, 0], [-1, 1]), [1])
+<                 flat_yp = tf.slice(concat_flat_yp, [0, 1], [-1, -1])
+< 
+<                 concat_flat_logits2 = tf.concat(axis=1, values=[na_bias_tiled, flat_logits2])
+<                 concat_flat_yp2 = tf.nn.softmax(concat_flat_logits2)
+<                 na_prob2 = tf.squeeze(tf.slice(concat_flat_yp2, [0, 0], [-1, 1]), [1])  # [N]
+<                 flat_yp2 = tf.slice(concat_flat_yp2, [0, 1], [-1, -1])
+< 
+<                 self.concat_logits = concat_flat_logits
+<                 self.concat_logits2 = concat_flat_logits2
+<                 self.na_prob = na_prob * na_prob2
+< 
+---
+>             na_bias = tf.get_variable("na_bias", shape=[1], dtype='float')
+>             na_bias_tiled = tf.tile(tf.reshape(na_bias, [1, 1]), [N, 1])  #  [N, 1]
+>             flat_logits = tf.reshape(logits, [-1, M * JX])  # [N, M*JX]
+>             concat_flat_logits = tf.concat(1, [na_bias_tiled, flat_logits])
+>             concat_flat_yp = tf.nn.softmax(concat_flat_logits)  # [-1, M*JX+1]
+>             na_prob = tf.squeeze(tf.slice(concat_flat_yp, [0, 0], [-1, 1]), [1])  # [N]
+>             flat_yp = tf.slice(concat_flat_yp, [0, 1], [-1, -1])
+230a190,195
+> 
+>             flat_logits2 = tf.reshape(logits2, [-1, M * JX])
+>             concat_flat_logits2 = tf.concat(1, [na_bias_tiled, flat_logits2])
+>             concat_flat_yp2 = tf.nn.softmax(concat_flat_logits2)
+>             na_prob2 = tf.squeeze(tf.slice(concat_flat_yp2, [0, 0], [-1, 1]), [1])  # [N]
+>             flat_yp2 = tf.slice(concat_flat_yp2, [0, 1], [-1, -1])
+232d196
+<             wyp = tf.nn.sigmoid(logits2)
+239,241c203,207
+<             self.yp = yp
+<             self.yp2 = yp2
+<             self.wyp = wyp
+---
+>             self.concat_logits = concat_flat_logits
+>             self.concat_logits2 = concat_flat_logits2
+>             self.yp = yp  # start prob dist
+>             self.yp2 = yp2  # end prob dist
+>             self.na_prob = na_prob * na_prob2
+248d213
+< 
+250,288c215,224
+<         if config.wy:
+<             losses = tf.nn.sigmoid_cross_entropy_with_logits(
+<                 logits=tf.reshape(self.logits2, [-1, M, JX]), labels=tf.cast(self.wy, 'float'))  # [N, M, JX]
+<             num_pos = tf.reduce_sum(tf.cast(self.wy, 'float'))
+<             num_neg = tf.reduce_sum(tf.cast(self.x_mask, 'float')) - num_pos
+<             damp_ratio = num_pos / num_neg
+<             dampened_losses = losses * (
+<                 (tf.cast(self.x_mask, 'float') - tf.cast(self.wy, 'float')) * damp_ratio + tf.cast(self.wy, 'float'))
+<             new_losses = tf.reduce_sum(dampened_losses, [1, 2])
+<             ce_loss = tf.reduce_mean(loss_mask * new_losses)
+<             """
+<             if config.na:
+<                 na = tf.reshape(self.na, [-1, 1])
+<                 concat_y = tf.concat(1, [na, tf.reshape(self.wy, [-1, M * JX])])
+<                 losses = tf.nn.softmax_cross_entropy_with_logits(
+<                     self.concat_logits, tf.cast(concat_y, 'float') / tf.reduce_sum(tf.cast(self.wy, 'float')))
+<             else:
+<                 losses = tf.nn.softmax_cross_entropy_with_logits(
+<                     self.logits2, tf.cast(tf.reshape(self.wy, [-1, M * JX]), 'float') / tf.reduce_sum(tf.cast(self.wy, 'float')))
+<             ce_loss = tf.reduce_mean(loss_mask * losses)
+<             """
+<             tf.add_to_collection('losses', ce_loss)
+< 
+<         else:
+<             if config.na:
+<                 na = tf.reshape(self.na, [-1, 1])
+<                 concat_y = tf.concat(axis=1, values=[na, tf.reshape(self.y, [-1, M * JX])])
+<                 losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.concat_logits, labels=tf.cast(concat_y, 'float'))
+<                 concat_y2 = tf.concat(axis=1, values=[na, tf.reshape(self.y2, [-1, M * JX])])
+<                 losses2 = tf.nn.softmax_cross_entropy_with_logits(logits=self.concat_logits2, labels=tf.cast(concat_y2, 'float'))
+<             else:
+<                 losses = tf.nn.softmax_cross_entropy_with_logits(
+<                     logits=self.logits, labels=tf.cast(tf.reshape(self.y, [-1, M * JX]), 'float'))
+<                 losses2 = tf.nn.softmax_cross_entropy_with_logits(
+<                     logits=self.logits2, labels=tf.cast(tf.reshape(self.y2, [-1, M * JX]), 'float'))
+<             ce_loss = tf.reduce_mean(loss_mask * losses)
+<             ce_loss2 = tf.reduce_mean(loss_mask * losses2)
+<             tf.add_to_collection('losses', ce_loss)
+<             tf.add_to_collection("losses", ce_loss2)
+---
+>         na = tf.reshape(self.na, [-1, 1])
+>         concat_y = tf.concat(1, [na, tf.reshape(self.y, [-1, M * JX])])
+>         losses = tf.nn.softmax_cross_entropy_with_logits(
+>             self.concat_logits, tf.cast(concat_y, 'float'))
+>         ce_loss = tf.reduce_mean(loss_mask * losses)
+>         tf.add_to_collection('losses', ce_loss)
+>         concat_y2 = tf.concat(1, [na, tf.reshape(self.y2, [-1, M * JX])])
+>         ce_loss2 = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+>             self.concat_logits2, tf.cast(concat_y2, 'float')))
+>         tf.add_to_collection("losses", ce_loss2)
+291c227
+<         tf.summary.scalar(self.loss.op.name, self.loss)
+---
+>         tf.scalar_summary(self.loss.op.name, self.loss)
+301c237
+<             tf.summary.scalar(ema_var.op.name, ema_var)
+---
+>             tf.scalar_summary(ema_var.op.name, ema_var)
+304c240
+<             tf.summary.histogram(ema_var.op.name, ema_var)
+---
+>             tf.histogram_summary(ema_var.op.name, ema_var)
+380d315
+<             wy = np.zeros([N, M, JX], dtype='bool')
+384d318
+<             feed_dict[self.wy] = wy
+390,406d323
+<                     continue
+<                 start_idx, stop_idx = random.choice(yi)
+<                 j, k = start_idx
+<                 j2, k2 = stop_idx
+<                 if config.single:
+<                     X[i] = [xi[j]]
+<                     CX[i] = [cxi[j]]
+<                     j, j2 = 0, 0
+<                 if config.squash:
+<                     offset = sum(map(len, xi[:j]))
+<                     j, k = 0, k + offset
+<                     offset = sum(map(len, xi[:j2]))
+<                     j2, k2 = 0, k2 + offset
+<                 y[i, j, k] = True
+<                 y2[i, j2, k2-1] = True
+<                 if j == j2:
+<                     wy[i, j, k:k2] = True
+408,409c325,339
+<                     wy[i, j, k:len(batch.data['x'][i][j])] = True
+<                     wy[i, j2, :k2] = True
+---
+>                     start_idx, stop_idx = random.choice(yi)
+>                     j, k = start_idx
+>                     j2, k2 = stop_idx
+>                     if config.single:
+>                         X[i] = [xi[j]]
+>                         CX[i] = [cxi[j]]
+>                         j, j2 = 0, 0
+>                     if config.squash:
+>                         offset = sum(map(len, xi[:j]))
+>                         j, k = 0, k + offset
+>                         offset = sum(map(len, xi[:j2]))
+>                         j2, k2 = 0, k2 + offset
+>                     y[i, j, k] = True
+>                     y2[i, j2, k2-1] = True
+> 
+440c370
+<                     x[i, j, k] = each
+---
+>                     x[i, j, k] = each if random.random() <= config.word_keep_prob else 1  # 1 is UNK
+469,471d398
+<         if supervised:
+<             assert np.sum(~(x_mask | ~wy)) == 0
+< 
+500c427
+<             variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=tf.get_variable_scope().name)
+---
+>             variables = tf.get_collection(tf.GraphKeys.VARIABLES, scope=tf.get_variable_scope().name)
+517c444
+<             p0 = tf.concat(axis=3, values=[h, u_a, h * u_a, h * h_a])
+---
+>             p0 = tf.concat(3, [h, u_a, h * u_a, h * h_a])
+519c446
+<             p0 = tf.concat(axis=3, values=[h, u_a, h * u_a])
+---
+>             p0 = tf.concat(3, [h, u_a, h * u_a])
+Only in basic/: __pycache__
+Only in basic/: read_data.pyc
+diff basic/run_ensemble.sh ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/run_ensemble.sh
+22c22
+<     eval_path="$inter_dir/eval-$num.pklz"
+---
+>     eval_path="$inter_dir/eval-$num.json"
+diff basic/run_single.sh ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/run_single.sh
+21c21
+< eval_path="$inter_dir/eval.pklz"
+---
+> eval_path="$inter_dir/eval.json"
+Common subdirectories: basic/templates and ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/templates
+diff basic/trainer.py ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/trainer.py
+12c12
+<         self.opt = tf.train.AdamOptimizer(config.init_lr)
+---
+>         self.opt = tf.train.AdadeltaOptimizer(config.init_lr)
+42c42
+<         self.opt = tf.train.AdamOptimizer(config.init_lr)
+---
+>         self.opt = tf.train.AdadeltaOptimizer(config.init_lr)
+diff basic/visualizer.py ../omerlevy-bidaf_no_answer-2e9868b224e4/basic/visualizer.py
+10,11d9
+< import pickle
+< import gzip
+15c13,14
+< from squad.utils import get_best_span, get_best_span_wy
+---
+> from basic.evaluator import get_span_score_pairs
+> from squad.utils import get_best_span, get_span_score_pairs
+38d36
+<     parser.add_argument("-w", "--wy", action='store_true')
+56c54
+<     eval_path =os.path.join("out", model_name, run_id, "eval", "{}-{}.pklz".format(data_type, str(step).zfill(6)))
+---
+>     eval_path =os.path.join("out", model_name, run_id, "eval", "{}-{}.json".format(data_type, str(step).zfill(6)))
+58c56
+<     eval_ = pickle.load(gzip.open(eval_path, 'r'))
+---
+>     eval_ = json.load(open(eval_path, 'r'))
+84c82
+<     for i, (idx, yi, ypi, yp2i, wypi) in tqdm(enumerate(zip(*[eval_[key] for key in ('idxs', 'y', 'yp', 'yp2', 'wyp')])), total=len(eval_['idxs'])):
+---
+>     for i, (idx, yi, ypi, yp2i) in tqdm(enumerate(zip(*[eval_[key] for key in ('idxs', 'y', 'yp', 'yp2')])), total=len(eval_['idxs'])):
+89c87
+<         span, score = get_best_span_wy(wypi, 0.5) if args.wy else get_best_span(ypi, yp2i)
+---
+>         span = get_best_span(ypi, yp2i)
+91c89
+<         # score = "{:.3f}".format(ypi[span[0][0]][span[0][1]] * yp2i[span[1][0]][span[1][1]-1])
+---
+>         score = "{:.3f}".format(ypi[span[0][0]][span[0][1]] * yp2i[span[1][0]][span[1][1]-1])
+100,101c98,99
+<             'yp': wypi if args.wy else ypi,
+<             'yp2': wypi if args.wy else yp2i,
+---
+>             'yp': ypi,
+>             'yp2': yp2i,
