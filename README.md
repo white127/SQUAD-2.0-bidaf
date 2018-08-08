@@ -1,15 +1,27 @@
-- test step 20000: accuracy=0.5434, f1=0.5865, loss=2.9873
-- {
--   "exact": 54.880822033184536,
--   "f1": 58.41531550070018,
--   "total": 11873,
--   "HasAns_exact": 54.942645074224025,
--   "HasAns_f1": 62.021768039779296,
--   "HasAns_total": 5928,
--   "NoAns_exact": 54.819175777964674,
--   "NoAns_f1": 54.819175777964674,
--   "NoAns_total": 5945
-- }
+test step 20000: accuracy=0.5434, f1=0.5865, loss=2.9873
+
+{
+
+  "exact": 54.880822033184536,
+  
+  "f1": 58.41531550070018,
+  
+  "total": 11873,
+  
+  "HasAns_exact": 54.942645074224025,
+  
+  "HasAns_f1": 62.021768039779296,
+  
+  "HasAns_total": 5928,
+  
+  "NoAns_exact": 54.819175777964674,
+  
+  "NoAns_f1": 54.819175777964674,
+  
+  "NoAns_total": 5945
+  
+}
+
 
 # Bi-directional Attention Flow for Machine Comprehension
  
